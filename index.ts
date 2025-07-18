@@ -3,16 +3,46 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import OpenAI from "openai";
 import { z } from "zod";
+import fs from "fs";
+import path from "path";
+import os from "os";
+
+// Function to load API key from environment variable or ~/.openai.env file
+function loadApiKey(): string | undefined {
+  // First, try environment variable
+  if (process.env.OPENAI_API_KEY) {
+    return process.env.OPENAI_API_KEY;
+  }
+  
+  // Then, try ~/.openai.env file
+  try {
+    const envPath = path.join(os.homedir(), '.openai.env');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      const lines = envContent.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('OPENAI_API_KEY=')) {
+          return trimmed.replace('OPENAI_API_KEY=', '').replace(/^["']|["']$/g, '');
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('Warning: Could not read ~/.openai.env file:', error);
+  }
+  
+  return undefined;
+}
 
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.0.5",
+  version: "0.0.6",
 });
 
 // Configuration from environment variables
 const config = {
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: loadApiKey(),
   maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || "3"),
   timeout: parseInt(process.env.OPENAI_API_TIMEOUT || "60000"),
   searchContextSize: (process.env.SEARCH_CONTEXT_SIZE || "medium") as
