@@ -31,6 +31,9 @@
   "license": "MIT",
   "description": "MCP server and CLI tool for web search by OpenAI o3 model",
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
     "prepublishOnly": "npm run build"
