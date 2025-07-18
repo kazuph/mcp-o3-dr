@@ -37,7 +37,7 @@ function loadApiKey(): string | undefined {
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.0.7",
+  version: "0.0.9",
 });
 
 // Configuration from environment variables
@@ -137,19 +137,79 @@ async function runCLI(query: string) {
   }
 }
 
-async function main() {
-  // Check if running as CLI with arguments
-  const args = process.argv.slice(2);
-  if (args.length > 0) {
-    const query = args.join(" ");
-    await runCLI(query);
-    return;
+function showHelp() {
+  console.log(`
+dr - Deep Research Tool
+
+Usage:
+  dr [query]                 Search with a query
+  dr -p "query"               Search with a query (alternative syntax)
+  dr mcp                     Start MCP server
+  dr -h, --help              Show this help message
+
+Examples:
+  dr "What is Node.js?"
+  dr -p "Latest AI trends"
+  dr mcp
+
+API Key Configuration:
+  Set OPENAI_API_KEY environment variable or create ~/.openai.env file with:
+  OPENAI_API_KEY=your-api-key-here
+`);
+}
+
+function parseArguments(args: string[]) {
+  if (args.length === 0) {
+    showHelp();
+    return { action: 'help' };
+  }
+
+  const firstArg = args[0];
+  
+  // Help options
+  if (firstArg === '-h' || firstArg === '--help') {
+    showHelp();
+    return { action: 'help' };
   }
   
-  // Otherwise, run as MCP server
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.log("MCP Server running on stdio");
+  // MCP server
+  if (firstArg === 'mcp') {
+    return { action: 'mcp' };
+  }
+  
+  // Search with -p option
+  if (firstArg === '-p' && args.length > 1) {
+    return { action: 'search', query: args.slice(1).join(' ') };
+  }
+  
+  // Default: search with all arguments as query
+  return { action: 'search', query: args.join(' ') };
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const parsed = parseArguments(args);
+  
+  switch (parsed.action) {
+    case 'help':
+      // Help already shown
+      break;
+      
+    case 'mcp':
+      // Run MCP server
+      const transport = new StdioServerTransport();
+      await server.connect(transport);
+      console.log("MCP Server running on stdio");
+      break;
+      
+    case 'search':
+      await runCLI(parsed.query!);
+      break;
+      
+    default:
+      console.error('Unknown action');
+      process.exit(1);
+  }
 }
 
 main().catch((error) => {
