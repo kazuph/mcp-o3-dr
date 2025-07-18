@@ -31,10 +31,9 @@
   "license": "MIT",
   "description": "MCP server and CLI tool for web search by OpenAI o3 model",
   "type": "module",
-  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.2",
