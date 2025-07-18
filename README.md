@@ -35,7 +35,7 @@ Run searches directly from the command line:
 export OPENAI_API_KEY=your-api-key
 
 # Run a search
-mcp-o3-dr "What are the latest developments in AI?"
+o3-dr "What are the latest developments in AI?"
 
 # Or with npx
 npx @kazuph/mcp-o3-dr "How to optimize React performance?"

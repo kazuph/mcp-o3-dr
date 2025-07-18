@@ -3,7 +3,7 @@
   "version": "0.0.5",
   "main": "build/index.js",
   "bin": {
-    "mcp-o3-dr": "./build/index.js"
+    "o3-dr": "./build/index.js"
   },
   "files": [
     "build/"
