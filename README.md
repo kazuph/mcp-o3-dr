@@ -1,43 +1,75 @@
-# o3-search-mcp
+# @kazuph/mcp-o3-dr
 
-An MCP (Model Context Protocol) server that provides web search capabilities using OpenAI's o3 model. The `o3-search` tool accepts text queries and returns AI-powered search results.
+An MCP (Model Context Protocol) server and CLI tool that provides web search capabilities using OpenAI's o3 model. Works both as an MCP server for Claude Code and as a standalone CLI tool.
 
-<a href="https://glama.ai/mcp/servers/@yoshiko-pg/o3-search-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@yoshiko-pg/o3-search-mcp/badge" alt="o3-search MCP server" />
-</a>
+## Features
+
+- 🔍 **Web Search**: AI-powered web search using OpenAI's o3 model
+- 🖥️ **CLI Mode**: Run searches directly from the command line
+- 🔌 **MCP Server**: Integrates with Claude Code via Model Context Protocol
+- ⚙️ **Configurable**: Customizable search context size and reasoning effort
+- 🔄 **Retry Logic**: Built-in retry mechanism with configurable timeout
 
 ## Installation
 
-### Using npx (Recommended)
+### Using npm (Recommended)
 
-Claude Code:
-
+```bash
+npm install -g @kazuph/mcp-o3-dr
 ```
+
+### Using npx (No Installation Required)
+
+```bash
+npx @kazuph/mcp-o3-dr "your search query"
+```
+
+## Usage
+
+### CLI Mode
+
+Run searches directly from the command line:
+
+```bash
+# Set your OpenAI API key
+export OPENAI_API_KEY=your-api-key
+
+# Run a search
+mcp-o3-dr "What are the latest developments in AI?"
+
+# Or with npx
+npx @kazuph/mcp-o3-dr "How to optimize React performance?"
+```
+
+### MCP Server Mode
+
+Integrate with Claude Code as an MCP server:
+
+**Claude Code:**
+
+```bash
 $ claude mcp add o3 -s user \
 	-e OPENAI_API_KEY=your-api-key \
 	-e SEARCH_CONTEXT_SIZE=medium \
 	-e REASONING_EFFORT=medium \
 	-e OPENAI_API_TIMEOUT=60000 \
 	-e OPENAI_MAX_RETRIES=3 \
-	-- npx o3-search-mcp
+	-- npx @kazuph/mcp-o3-dr
 ```
 
-json:
+**JSON Configuration:**
 
 ```json
 {
   "mcpServers": {
     "o3-search": {
       "command": "npx",
-      "args": ["o3-search-mcp"],
+      "args": ["@kazuph/mcp-o3-dr"],
       "env": {
         "OPENAI_API_KEY": "your-api-key",
-        // Optional: low, medium, high (default: medium)
         "SEARCH_CONTEXT_SIZE": "medium",
         "REASONING_EFFORT": "medium",
-        // Optional: API timeout in milliseconds (default: 60000)
         "OPENAI_API_TIMEOUT": "60000",
-        // Optional: Maximum retry attempts (default: 3)
         "OPENAI_MAX_RETRIES": "3"
       }
     }
@@ -50,41 +82,44 @@ json:
 If you want to download and run the code locally:
 
 ```bash
-# setup
-git clone git@github.com:yoshiko-pg/o3-search-mcp.git
-cd o3-search-mcp
+# Clone the repository
+git clone https://github.com/kazuph/mcp-o3-dr.git
+cd mcp-o3-dr
 pnpm install
 pnpm build
+
+# Set environment variable
+export OPENAI_API_KEY=your-api-key
+
+# Run as CLI
+node build/index.js "your search query"
 ```
 
-Claude Code:
+**Claude Code with local build:**
 
-```
+```bash
 $ claude mcp add o3 -s user \
 	-e OPENAI_API_KEY=your-api-key \
 	-e SEARCH_CONTEXT_SIZE=medium \
 	-e REASONING_EFFORT=medium \
 	-e OPENAI_API_TIMEOUT=60000 \
 	-e OPENAI_MAX_RETRIES=3 \
-	-- node /path/to/o3-search-mcp/build/index.js
+	-- node /path/to/mcp-o3-dr/build/index.js
 ```
 
-json:
+**JSON Configuration:**
 
 ```json
 {
   "mcpServers": {
     "o3-search": {
       "command": "node",
-      "args": ["/path/to/o3-search-mcp/build/index.js"],
+      "args": ["/path/to/mcp-o3-dr/build/index.js"],
       "env": {
         "OPENAI_API_KEY": "your-api-key",
-        // Optional: low, medium, high (default: medium)
         "SEARCH_CONTEXT_SIZE": "medium",
         "REASONING_EFFORT": "medium",
-        // Optional: API timeout in milliseconds (default: 60000)
         "OPENAI_API_TIMEOUT": "60000",
-        // Optional: Maximum retry attempts (default: 3)
         "OPENAI_MAX_RETRIES": "3"
       }
     }

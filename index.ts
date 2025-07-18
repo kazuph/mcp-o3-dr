@@ -6,8 +6,8 @@ import { z } from "zod";
 
 // Create server instance
 const server = new McpServer({
-  name: "o3-search-mcp",
-  version: "0.0.1",
+  name: "@kazuph/mcp-o3-dr",
+  version: "0.0.5",
 });
 
 // Configuration from environment variables
@@ -81,7 +81,42 @@ server.tool(
   },
 );
 
+async function runCLI(query: string) {
+  console.log(`🔍 Searching for: ${query}`);
+  
+  try {
+    const response = await openai.responses.create({
+      model: "o3",
+      input: query,
+      tools: [
+        {
+          type: "web_search_preview",
+          search_context_size: config.searchContextSize,
+        },
+      ],
+      tool_choice: "auto",
+      parallel_tool_calls: true,
+      reasoning: { effort: config.reasoningEffort },
+    });
+
+    console.log("\n📄 Results:");
+    console.log(response.output_text || "No response text available.");
+  } catch (error) {
+    console.error("❌ Error:", error instanceof Error ? error.message : "Unknown error occurred");
+    process.exit(1);
+  }
+}
+
 async function main() {
+  // Check if running as CLI with arguments
+  const args = process.argv.slice(2);
+  if (args.length > 0) {
+    const query = args.join(" ");
+    await runCLI(query);
+    return;
+  }
+  
+  // Otherwise, run as MCP server
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.log("MCP Server running on stdio");
