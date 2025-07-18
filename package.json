@@ -1,6 +1,6 @@
 {
   "name": "@kazuph/mcp-o3-dr",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "main": "build/index.js",
   "bin": {
     "o3-dr": "./build/index.js"
