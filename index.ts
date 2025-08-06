@@ -37,7 +37,7 @@ function loadApiKey(): string | undefined {
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.0.9",
+  version: "0.1.0",
 });
 
 // Configuration from environment variables
@@ -61,6 +61,32 @@ const openai = new OpenAI({
   maxRetries: config.maxRetries,
   timeout: config.timeout,
 });
+
+// Function to read from stdin
+async function readStdin(): Promise<string | null> {
+  // Check if stdin is a TTY (interactive terminal)
+  if (process.stdin.isTTY) {
+    return null;
+  }
+
+  return new Promise((resolve, reject) => {
+    let data = '';
+    process.stdin.setEncoding('utf8');
+    
+    process.stdin.on('readable', () => {
+      let chunk;
+      while (null !== (chunk = process.stdin.read())) {
+        data += chunk;
+      }
+    });
+    
+    process.stdin.on('end', () => {
+      resolve(data.trim());
+    });
+    
+    process.stdin.on('error', reject);
+  });
+}
 
 // Define the o3-search tool
 server.tool(
@@ -146,10 +172,17 @@ Usage:
   dr -p "query"               Search with a query (alternative syntax)
   dr mcp                     Start MCP server
   dr -h, --help              Show this help message
+  
+  Supports stdin input:
+  echo "query" | dr         Search with stdin input
+  cat file.txt | dr         Search with file content
+  dr < file.txt             Search with file content
 
 Examples:
   dr "What is Node.js?"
   dr -p "Latest AI trends"
+  echo "What is React?" | dr
+  cat error.log | dr "explain this error"
   dr mcp
 
 API Key Configuration:
@@ -188,6 +221,48 @@ function parseArguments(args: string[]) {
 
 async function main() {
   const args = process.argv.slice(2);
+  
+  // Check for stdin input
+  const stdinData = await readStdin();
+  
+  // If stdin has data and no arguments, use stdin as search query
+  if (stdinData && args.length === 0) {
+    await runCLI(stdinData);
+    return;
+  }
+  
+  // If stdin has data and arguments, combine them
+  if (stdinData && args.length > 0) {
+    // If the first argument is a flag or mcp, handle normally
+    const firstArg = args[0];
+    if (firstArg && (firstArg === 'mcp' || firstArg.startsWith('-'))) {
+      const parsed = parseArguments(args);
+      
+      switch (parsed.action) {
+        case 'help':
+          // Help already shown
+          break;
+          
+        case 'mcp':
+          // Run MCP server
+          const transport = new StdioServerTransport();
+          await server.connect(transport);
+          console.log("MCP Server running on stdio");
+          break;
+          
+        case 'search':
+          // Append stdin data to the query
+          await runCLI((parsed.query || '') + ' ' + stdinData);
+          break;
+      }
+    } else {
+      // Use args as query and append stdin data
+      await runCLI(args.join(' ') + ' ' + stdinData);
+    }
+    return;
+  }
+  
+  // No stdin data, process normally
   const parsed = parseArguments(args);
   
   switch (parsed.action) {
@@ -203,7 +278,9 @@ async function main() {
       break;
       
     case 'search':
-      await runCLI(parsed.query!);
+      if (parsed.query) {
+        await runCLI(parsed.query);
+      }
       break;
       
     default:
