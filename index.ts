@@ -37,7 +37,7 @@ function loadApiKey(): string | undefined {
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.1.0",
+  version: "0.1.1",
 });
 
 // Configuration from environment variables
@@ -61,6 +61,30 @@ const openai = new OpenAI({
   maxRetries: config.maxRetries,
   timeout: config.timeout,
 });
+
+// Function to create cache directory and log file path
+function setupLogFile(): { logPath: string; logStream: fs.WriteStream } {
+  const cacheDir = path.join(os.homedir(), '.cache', 'dr');
+  
+  // Create cache directory if it doesn't exist
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  
+  // Generate filename with date-time
+  const now = new Date();
+  const dateTime = now.toISOString()
+    .replace(/T/, '-')
+    .replace(/:/g, '-')
+    .replace(/\..+/, '');
+  const filename = `${dateTime}.md`;
+  const logPath = path.join(cacheDir, filename);
+  
+  // Create write stream for real-time logging
+  const logStream = fs.createWriteStream(logPath, { flags: 'w' });
+  
+  return { logPath, logStream };
+}
 
 // Function to read from stdin
 async function readStdin(): Promise<string | null> {
@@ -138,9 +162,24 @@ server.tool(
 );
 
 async function runCLI(query: string) {
+  // Setup log file
+  const { logPath, logStream } = setupLogFile();
+  
+  // Display log path at the beginning
+  console.log(`📝 調査ログ: ${logPath}`);
   console.log(`🔍 Searching for: ${query}`);
   
+  // Write initial query to log file
+  logStream.write(`# Deep Research Log\n\n`);
+  logStream.write(`**Date**: ${new Date().toISOString()}\n\n`);
+  logStream.write(`**Query**: ${query}\n\n`);
+  logStream.write(`---\n\n`);
+  
   try {
+    // Log that we're starting the API call
+    logStream.write(`## Processing\n\n`);
+    logStream.write(`Calling OpenAI o3 model...\n\n`);
+    
     const response = await openai.responses.create({
       model: "o3",
       input: query,
@@ -155,10 +194,33 @@ async function runCLI(query: string) {
       reasoning: { effort: config.reasoningEffort },
     });
 
+    const resultText = response.output_text || "No response text available.";
+    
+    // Write results to both console and log file
     console.log("\n📄 Results:");
-    console.log(response.output_text || "No response text available.");
+    console.log(resultText);
+    
+    // Write final results to log file
+    logStream.write(`## Results\n\n`);
+    logStream.write(resultText);
+    logStream.write(`\n\n---\n\n`);
+    logStream.write(`**Completed**: ${new Date().toISOString()}\n`);
+    
+    // Close the stream
+    logStream.end();
+    
+    console.log(`\n✅ ログファイル保存完了: ${logPath}`);
   } catch (error) {
-    console.error("❌ Error:", error instanceof Error ? error.message : "Unknown error occurred");
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    
+    // Log error to both console and file
+    console.error("❌ Error:", errorMessage);
+    
+    logStream.write(`## Error\n\n`);
+    logStream.write(`❌ ${errorMessage}\n\n`);
+    logStream.write(`**Failed**: ${new Date().toISOString()}\n`);
+    logStream.end();
+    
     process.exit(1);
   }
 }
