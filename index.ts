@@ -44,7 +44,7 @@ const server = new McpServer({
 const config = {
   apiKey: loadApiKey(),
   maxRetries: parseInt(process.env.OPENAI_MAX_RETRIES || "3"),
-  timeout: parseInt(process.env.OPENAI_API_TIMEOUT || "60000"),
+  timeout: parseInt(process.env.OPENAI_API_TIMEOUT || "1800000"),
   searchContextSize: (process.env.SEARCH_CONTEXT_SIZE || "medium") as
     | "low"
     | "medium"
