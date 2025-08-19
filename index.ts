@@ -86,6 +86,33 @@ function setupLogFile(): { logPath: string; logStream: fs.WriteStream } {
   return { logPath, logStream };
 }
 
+// Function to show progress messages and handle timeout
+async function progressWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  progressCallback: () => void
+): Promise<T> {
+  let progressInterval: NodeJS.Timeout;
+  
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const timeout = setTimeout(() => {
+      clearInterval(progressInterval);
+      reject(new Error(`Request timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+    
+    // Clear timeout if promise resolves first
+    promise.finally(() => {
+      clearTimeout(timeout);
+      clearInterval(progressInterval);
+    });
+  });
+  
+  // Start progress indicator
+  progressInterval = setInterval(progressCallback, 10000); // Every 10 seconds
+  
+  return Promise.race([promise, timeoutPromise]);
+}
+
 // Function to read from stdin
 async function readStdin(): Promise<string | null> {
   // Check if stdin is a TTY (interactive terminal)
@@ -124,8 +151,13 @@ server.tool(
       ),
   },
   async ({ input }) => {
+    const startTime = Date.now();
+    let progressCount = 0;
+    
     try {
-      const response = await openai.responses.create({
+      console.error("⏳ o3-search: Processing query (this may take several minutes)...");
+      
+      const apiCall = openai.responses.create({
         model: "o3",
         input,
         tools: [
@@ -138,6 +170,19 @@ server.tool(
         parallel_tool_calls: true,
         reasoning: { effort: config.reasoningEffort },
       });
+      
+      const response = await progressWithTimeout(
+        apiCall,
+        config.timeout,
+        () => {
+          progressCount++;
+          const elapsed = Math.round((Date.now() - startTime) / 1000);
+          console.error(`🔄 o3-search: Still processing... (${elapsed}s elapsed, check ${progressCount})`);
+        }
+      );
+
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      console.error(`✅ o3-search: Completed in ${totalTime}s`);
 
       return {
         content: [
@@ -148,12 +193,19 @@ server.tool(
         ],
       };
     } catch (error) {
-      console.error("Error calling OpenAI API:", error);
+      const totalTime = Math.round((Date.now() - startTime) / 1000);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      
+      console.error(`❌ o3-search: Error after ${totalTime}s:`, errorMessage);
+      if (progressCount > 0) {
+        console.error(`🔄 o3-search: Progress was tracked (${progressCount} checks completed)`);
+      }
+      
       return {
         content: [
           {
             type: "text",
-            text: `Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`,
+            text: `Error after ${totalTime}s: ${errorMessage}${progressCount > 0 ? ` (Progress was tracked with ${progressCount} checks)` : ""}`,
           },
         ],
       };
@@ -175,12 +227,17 @@ async function runCLI(query: string) {
   logStream.write(`**Query**: ${query}\n\n`);
   logStream.write(`---\n\n`);
   
+  let startTime = Date.now();
+  let progressCount = 0;
+  
   try {
     // Log that we're starting the API call
     logStream.write(`## Processing\n\n`);
+    logStream.write(`Started: ${new Date().toISOString()}\n`);
     logStream.write(`Calling OpenAI o3 model...\n\n`);
+    console.log("⏳ Processing with o3 model (this may take several minutes)...");
     
-    const response = await openai.responses.create({
+    const apiCall = openai.responses.create({
       model: "o3",
       input: query,
       tools: [
@@ -193,15 +250,30 @@ async function runCLI(query: string) {
       parallel_tool_calls: true,
       reasoning: { effort: config.reasoningEffort },
     });
+    
+    const response = await progressWithTimeout(
+      apiCall,
+      config.timeout,
+      () => {
+        progressCount++;
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const progressMsg = `🔄 Still processing... (${elapsed}s elapsed, check ${progressCount})`;
+        console.log(progressMsg);
+        logStream.write(`Progress: ${progressMsg} - ${new Date().toISOString()}\n`);
+      }
+    );
 
     const resultText = response.output_text || "No response text available.";
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
     
     // Write results to both console and log file
+    console.log(`\n✅ Completed in ${totalTime}s`);
     console.log("\n📄 Results:");
     console.log(resultText);
     
     // Write final results to log file
-    logStream.write(`## Results\n\n`);
+    logStream.write(`\n## Results\n\n`);
+    logStream.write(`Completed in ${totalTime}s\n\n`);
     logStream.write(resultText);
     logStream.write(`\n\n---\n\n`);
     logStream.write(`**Completed**: ${new Date().toISOString()}\n`);
@@ -212,15 +284,25 @@ async function runCLI(query: string) {
     console.log(`\n✅ ログファイル保存完了: ${logPath}`);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    const totalTime = Math.round((Date.now() - startTime) / 1000);
     
     // Log error to both console and file
-    console.error("❌ Error:", errorMessage);
+    console.error(`\n❌ Error after ${totalTime}s:`, errorMessage);
     
-    logStream.write(`## Error\n\n`);
+    logStream.write(`\n## Error\n\n`);
+    logStream.write(`Failed after ${totalTime}s\n`);
     logStream.write(`❌ ${errorMessage}\n\n`);
+    
+    // Save any partial progress info
+    if (progressCount > 0) {
+      logStream.write(`Progress checks completed: ${progressCount}\n`);
+      console.log(`🔄 Progress was tracked (${progressCount} checks completed)`);
+    }
+    
     logStream.write(`**Failed**: ${new Date().toISOString()}\n`);
     logStream.end();
     
+    console.log(`\n📝 Error log saved: ${logPath}`);
     process.exit(1);
   }
 }
