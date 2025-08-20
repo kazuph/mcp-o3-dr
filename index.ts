@@ -37,7 +37,7 @@ function loadApiKey(): string | undefined {
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.1.1",
+  version: "0.2.0",
 });
 
 // Configuration from environment variables
