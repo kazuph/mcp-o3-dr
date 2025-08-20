@@ -6,6 +6,10 @@ import { z } from "zod";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Function to load API key from environment variable or ~/.openai.env file
 function loadApiKey(): string | undefined {
@@ -37,7 +41,7 @@ function loadApiKey(): string | undefined {
 // Create server instance
 const server = new McpServer({
   name: "@kazuph/mcp-o3-dr",
-  version: "0.2.0",
+  version: "0.2.1",
 });
 
 // Configuration from environment variables
@@ -307,6 +311,16 @@ async function runCLI(query: string) {
   }
 }
 
+function showVersion() {
+  try {
+    const packageJsonPath = path.join(__dirname, '../package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    console.log(packageJson.version);
+  } catch (error) {
+    console.log("0.2.1"); // Fallback version
+  }
+}
+
 function showHelp() {
   console.log(`
 dr - Deep Research Tool
@@ -316,6 +330,7 @@ Usage:
   dr -p "query"               Search with a query (alternative syntax)
   dr mcp                     Start MCP server
   dr -h, --help              Show this help message
+  dr -v, --version           Show version number
   
   Supports stdin input:
   echo "query" | dr         Search with stdin input
@@ -347,6 +362,12 @@ function parseArguments(args: string[]) {
   if (firstArg === '-h' || firstArg === '--help') {
     showHelp();
     return { action: 'help' };
+  }
+  
+  // Version options
+  if (firstArg === '-v' || firstArg === '--version') {
+    showVersion();
+    return { action: 'version' };
   }
   
   // MCP server
@@ -387,6 +408,10 @@ async function main() {
           // Help already shown
           break;
           
+        case 'version':
+          // Version already shown
+          break;
+          
         case 'mcp':
           // Run MCP server
           const transport = new StdioServerTransport();
@@ -412,6 +437,10 @@ async function main() {
   switch (parsed.action) {
     case 'help':
       // Help already shown
+      break;
+      
+    case 'version':
+      // Version already shown
       break;
       
     case 'mcp':
